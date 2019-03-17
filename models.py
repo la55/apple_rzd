@@ -48,7 +48,6 @@ class Item():
         """.format(x, y, name)
         cursor.execute(sql)
         one = cursor.fetchone()
-        print(one)
         if one:
             return cls(*one)
         return None

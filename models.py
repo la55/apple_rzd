@@ -13,10 +13,10 @@ class Thing():
         
 
 class Stock():
-
     def __init__(self, x_max, y_max, names):
         self.x_max = x_max 
         self.y_max = y_max
+        self.names = names
         self.items = [Item(x + 1, y + 1, name, 0) 
                         for x in range(x_max) for y in range(y_max) for name in names]
         self.cells = [{ 'pk': '{}{}'.format(x + 1, y + 1), 
@@ -26,18 +26,6 @@ class Stock():
 
     def __getitem__(self, index):
         return self.items[index]
-
-    @classmethod
-    def from_db(cls, cursor, dbconn):
-        cursor.execute("""SELECT MAX(x), MAX(y) FROM items""")
-        x_max, y_max = cursor.fetchone()
-        cursor.execute("""SELECT x, y, name, count FROM items""")
-        rows = cursor.fetchall()
-        if rows:
-            items = [Item(*row) for row in rows]
-        else:
-            items = []
-        return cls(x_max, y_max, items)
 
     def __str__(self):
         return str(self.items)
@@ -58,7 +46,7 @@ class Item():
         """.format(x, y, name)
         cursor.execute(sql)
         one = cursor.fetchone()
-        if one:
+        if one[0] != None:
             return cls(*one)
         return None
 

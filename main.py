@@ -16,9 +16,11 @@ define("port", default=8080, help="app port", type=int)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) 
 
+#Store for websockets objects
 connections = set() 
   
 #Ininial data
+#Setup DB
 dbconn = sqlite3.connect('db.sqlite3')
 cursor = dbconn.cursor()
 cursor.execute('''CREATE TABLE if not exists things (pk INTEGER PRIMARY KEY, 
@@ -28,14 +30,16 @@ cursor.execute('''CREATE TABLE if not exists items
 cursor.execute('''DELETE FROM things''')
 cursor.execute('''DELETE FROM items''')
 dbconn.commit()
+#Create 2 fruit
 apple = Thing('apple', '/media/img/apple.png')
 banana = Thing('banana', '/media/img/banana.png')
 apple.create(cursor, dbconn)
 banana.create(cursor, dbconn)
+#Create stock
 stock = Stock(3, 3, ['banana', 'apple'])
+[i.create(cursor, dbconn) for i in stock]
 images = {}
 [ images.setdefault(i.name, i.img) for i in [apple, banana] ]
-[i.create(cursor, dbconn) for i in stock]
 
 class WebSocketHandler(WebSocketHandler):
 
@@ -61,8 +65,6 @@ class WebSocketHandler(WebSocketHandler):
             item.count = item.count + 1
             #Update
             item.update(cursor, dbconn)
-            #Check db again!
-            item = Item.from_db(cursor, dbconn, x, y, name)
             msg = json.dumps({ 'action' : 'put', 'to': to, 'name': name, 'count': item.count})
             print(msg)
             [con.write_message(msg) for con in connections]
@@ -81,9 +83,6 @@ class WebSocketHandler(WebSocketHandler):
             #Update
             item_to.update(cursor, dbconn)
             item_from.update(cursor, dbconn)
-            #Check db again 
-            item_to = Item.from_db(cursor, dbconn, x_to, y_to, name)
-            item_from = Item.from_db(cursor, dbconn, x_from, y_from, name)
             msg = json.dumps({ 'action' : 'move', 'to': to, 'from': from_pk,
                                'to_count': item_to.count, 'from_count': item_from.count,  'name': name})
             print(msg)
@@ -99,8 +98,6 @@ class WebSocketHandler(WebSocketHandler):
                 item.count = item.count - 1
             #Update
             item.update(cursor, dbconn)
-            #Check db again!
-            item = Item.from_db(cursor, dbconn, x, y, name)
             msg = json.dumps({ 'action' : 'put', 'to': to, 'name': name, 'count': item.count})
             print(msg)
             [con.write_message(msg) for con in connections]

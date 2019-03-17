@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Apple Stock</title>
+  <script src="/static/vue.min.js"></script>
+  <script src="/static/vue-drag-drop.js"></script>
+</head>
+<style>
+ body {background-color: #000; color: #fff; }
+ .settings { margin-bottom: -100px; float: right; font-size: 0.7em; }
+ .container { width: {{ 100 // x_max  }}%; display: inline-block; border: 1px solid white;}
+ .box { display: inline-block }
+ .drop { padding: 10px; height: 150px; }
+ img { width: 100px; height: 100px; }
+</style>
+<body>
+    <div id='root'>
+
+            <div class="settings">
+              <div v-if="onAir == 1" style="background:green;padding:0.3em;color:white">
+                  Connected
+              </div>
+              <div v-if="onAir == 0" style="background:red;padding:0.3;color:white">
+                  No connection
+              </div>
+            </div>
+              
+           <div v-for="cell in fruits"> 
+                <div class="box" v-for="item in cell.items">
+                <drag class="drag box" :transfer-data="{ cell, item }">
+                  <img :src="img[item.name]" :alt="item.name" >
+                </drag>
+                </div>
+            </div>
+
+              <div class="container" v-for="cell in xy" v-model="cell">
+                    <drop class="drop" @drop="function(transferData, nativeEvent) { handleDrop(cell.pk, transferData, nativeEvent) }">
+                      <div class="box" v-for="item in cell.items">
+                        <drag class="drag box" :transfer-data="{ cell, item }" v-show="item.count > 0">
+                          <img :src="img[item.name]" :alt="item.name" @contextmenu="deleteFunc($event, cell, item)">
+                          <span class="count" v-text="item.count"></span>
+                        </drag>
+                        <div v-show="item.count < 1">
+                          <img src="/media/img/empty.png" alt="empty">
+                          <span class="count" style="color:#000;">0</span>
+                        </div>
+                      </div>
+                    </drop>
+              </div>
+      </div>
+<script>
+  var app = new Vue({
+    
+    el : '#root',
+
+    data: {
+      img: {}, 
+      fruits: [],
+      xy: [],
+      x_max : 3,
+      y_max : 3,
+      onAir : 0,
+      prods: []
+    },
+
+    created: function () {
+      this.ws =  new WebSocket("ws://{{ server_url }}:{{ server_port }}/socket");
+      this.ws.onopen = function(e) {
+        app.onAir = 1
+      }
+      this.ws.onclose = function(e) {
+        app.onAir = 0
+      }
+      this.ws.onmessage = function(e) {
+        let data = JSON.parse(e.data)
+        let action = data.action
+        if (action == 'init') {
+          app.xy = data.xy
+          app.fruits = data.fruits
+          app.img = data.images
+        }
+        if (action == 'move') {
+          let name = data.name
+          let from = data.from
+          let from_count = data.from_count
+          let to = data.to
+          let to_count = data.to_count
+          let in_cell_to = app.xy.filter(cell => cell.pk == to)[0]
+          let item_to = in_cell_to.items.filter(item => item.name == name)[0];
+          let in_cell_from = app.xy.filter(cell => cell.pk == from)[0]
+          let item_from = in_cell_from.items.filter(item => item.name == name)[0];
+          item_from.count = from_count
+          item_to.count = to_count
+        }
+        if (action == 'put') {
+          let name = data.name
+          let to = data.to
+          let count = data.count
+          let in_cell_to = app.xy.filter(cell => cell.pk == to)[0]
+          let item_to = in_cell_to.items.filter(item => item.name == name)[0];
+          item_to.count = count 
+        }
+        if (action == 'deleted') {
+          //used put
+        }
+      }
+    },
+
+    methods: {
+      handleDrop: function (to_pk, from_cell, evt) {
+        let name = from_cell.item.name
+        let from_pk = from_cell.cell.pk
+        let to = to_pk
+        message = JSON.stringify({ action: 'move', from: from_pk, to: to, name: name})
+        if (from_pk == '00') {
+          message = JSON.stringify({ action: 'put', pk: to, name: name})
+        }
+        console.log(message)
+        app.ws.send(message)
+      },
+      deleteFunc: function (evt, cell, item) {
+        let from_pk = cell.pk
+        let name = item.name
+        let message = JSON.stringify({ action: 'delete', pk: from_pk, name: name })
+        console.log(message)
+        app.ws.send(message)
+        evt.preventDefault();
+      }
+    }
+  });
+</script>
+</body>
+</html>
+

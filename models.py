@@ -5,63 +5,78 @@ class Thing():
         self.img = img
 
     def __repr__(self):
-        return self.name
+        return '{} {}'.format(self.name, self.image)
 
+    def create(self, cursor, dbconn):
+        cursor.execute('''INSERT OR IGNORE INTO things (name, img) values ('{0}', '{1}')'''.format(self.name, self.img))
+        dbconn.commit()
+        
 
 class Stock():
 
-    def __init__(self, x, y):
-        self.x = 0
-        self.y = 0
-        self.things = [[ [] for i in range(x)] for g in range(y)]
+    def __init__(self, x_max, y_max, names):
+        self.x_max = x_max 
+        self.y_max = y_max
+        self.items = [Item(x + 1, y + 1, name, 0) 
+                        for x in range(x_max) for y in range(y_max) for name in names]
+        self.cells = [{ 'pk': '{}{}'.format(x + 1, y + 1), 
+                        'items': [{ 'name': name, 'count': 0 } for name in names] }
+                        for x in range(x_max) for y in range(y_max)]
+        self.fruits = [{ 'pk': '00', 'items': [{ 'name': name, 'count': 1 } for name in names] }]
+
+    def __getitem__(self, index):
+        return self.items[index]
+
+    @classmethod
+    def from_db(cls, cursor, dbconn):
+        cursor.execute("""SELECT MAX(x), MAX(y) FROM items""")
+        x_max, y_max = cursor.fetchone()
+        cursor.execute("""SELECT x, y, name, count FROM items""")
+        rows = cursor.fetchall()
+        if rows:
+            items = [Item(*row) for row in rows]
+        else:
+            items = []
+        return cls(x_max, y_max, items)
 
     def __str__(self):
-        pass
-
-    def __repr__(self):
-        return self.things
+        return str(self.items)
     
-    def put_one(self, thing, x, y):
-        cell = self.things[x][y]
-        cell.append(thing)
 
-    def delete_one(self, thing, x, y):
-        cell = self.things[x][y]
-        # If name match, remove thing
-        for item in cell:
-            if item.name == thing.name:
-                cell.remove(item)
+class Item():
 
-    def put_many(self, things, x, y): 
-        for thing in things:
-            self.put_one(thing, x, y)
+    def __init__(self, x, y, name, count):
+        self.x = x 
+        self.y = y
+        self.name = name
+        self.count = count
 
-    def delete_many(self, things, x, y): 
-        for thing in things:
-            self.delete_one(thing, x, y)
+    @classmethod
+    def from_db(cls, cursor, dbconn, x, y, name):
+        sql = """SELECT x, y, name, count FROM items 
+             WHERE x={0} AND y={1} AND name='{2}'
+        """.format(x, y, name)
+        cursor.execute(sql)
+        one = cursor.fetchone()
+        if one:
+            return cls(*one)
+        return None
+
+    def __str__(self):
+        return '{} {} {} {}'.format(self.x, self.y, self.name, self.count)
+
+    def create(self, cursor, dbconn):
+        sql = """INSERT OR IGNORE INTO items
+        (x, y, name, count) values ({}, {}, '{}', {})     
+        """.format(self.x, self.y, self.name, self.count)
+        res = cursor.execute(sql)
+        dbconn.commit()
+        print('created:', self)
         
-    def delete_all(self, x, y): 
-        cell = self.things[x][y]
-        cell = []
-
-    def move(self, things, x_from, y_from, x_to, y_to):
-        self.delete_many(things, x_from, y_from)
-        self.put_many(things, x_to, y_to)
-    
-
-if __name__ == '__main__':
-
-    apple = Thing('apple', 'apple.jpg')
-    banana = Thing('banana', 'banana.jpg')
-    stock = Stock(3, 4)
-    stock.put_one(apple, 0, 2)
-    stock.put_one(apple, 0, 2)
-    stock.put_one(banana, 0, 2)
-    stock.delete_one(banana, 0, 2)
-    stock.delete_one(apple, 0, 2)
-    stock.delete_many([apple, apple, banana], 0, 2)
-    stock.put_many([banana, apple, banana], 0, 2)
-    print(stock.things)
-    stock.move([banana, apple, banana], 0, 2, 1, 2)
-    print(stock.things)
-    
+    def update(self, cursor, dbconn):
+        sql = """UPDATE items SET count={0}
+             WHERE x={1} AND y={2} AND name='{3}'
+        """.format(self.count, self.x, self.y, self.name)
+        res = cursor.execute(sql)
+        dbconn.commit()
+        print('updated:', self)

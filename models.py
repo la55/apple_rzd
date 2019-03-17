@@ -17,8 +17,10 @@ class Stock():
         self.x_max = x_max 
         self.y_max = y_max
         self.names = names
+        #For bulk operations with items
         self.items = [Item(x + 1, y + 1, name, 0) 
                         for x in range(x_max) for y in range(y_max) for name in names]
+        #Frontend initial data (cells, fruits)
         self.cells = [{ 'pk': '{}{}'.format(x + 1, y + 1), 
                         'items': [{ 'name': name, 'count': 0 } for name in names] }
                         for x in range(x_max) for y in range(y_max)]
@@ -46,7 +48,8 @@ class Item():
         """.format(x, y, name)
         cursor.execute(sql)
         one = cursor.fetchone()
-        if one[0] != None:
+        print(one)
+        if one:
             return cls(*one)
         return None
 

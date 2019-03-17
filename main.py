@@ -37,9 +37,12 @@ apple.create(cursor, dbconn)
 banana.create(cursor, dbconn)
 #Create stock
 stock = Stock(3, 3, ['banana', 'apple'])
+#Fill all cells
 [i.create(cursor, dbconn) for i in stock]
+#Image dict for frontend
 images = {}
 [ images.setdefault(i.name, i.img) for i in [apple, banana] ]
+
 
 class WebSocketHandler(WebSocketHandler):
 
@@ -50,6 +53,7 @@ class WebSocketHandler(WebSocketHandler):
     def open(self):
         if self not in connections:
             connections.add(self)
+        #Send initial data to frontend
         msg = json.dumps({ 'action' : 'init', 'xy' : stock.cells, 'fruits': stock.fruits, 'images': images })
         [con.write_message(msg) for con in connections]
 
